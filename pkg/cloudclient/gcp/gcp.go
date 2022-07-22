@@ -27,6 +27,11 @@ type Client struct {
 	tags           map[string]string
 	logger         ocmlog.Logger
 	output         output.Output
+	// Following two services get called by verifier which are defined in separate interfaces below, so we can mock their calls. 
+	// however, currently, `createComputeServiceInstance` function uses a different version of rest client in instance `insert` function. 
+	// That would need to be updated to use these computev1 based mocks. 
+	instanceClient    InstancesClient
+	machineTypeClient MachineTypeClient
 }
 
 // type computepb interface {
@@ -39,6 +44,7 @@ type InstancesClient interface {
 	SetLabels(projectID string, zone string, instanceName string, reqbody *computev1.InstancesSetLabelsRequest) *computev1.InstancesSetLabelsCall
 	GetSerialPortOutput(projectID string, zone string, instanceName string) *computev1.InstancesGetSerialPortOutputCall
 	Stop(projectID string, zone string, instanceName string) *computev1.InstancesStopCall
+	Insert(project string, zone string, instance *computev1.Instance) *computev1.InstancesInsertCall
 }
 
 func (c *Client) ByoVPCValidator(ctx context.Context) error {

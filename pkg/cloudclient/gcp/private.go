@@ -61,14 +61,16 @@ func newClient(ctx context.Context, logger ocmlog.Logger, credentials *google.Cr
 	}
 
 	c := &Client{
-		projectID:      credentials.ProjectID,
-		region:         region,
-		zone:           fmt.Sprintf("%s-b", region), //append zone b
-		instanceType:   instanceType,
-		computeService: computeService,
-		tags:           tags,
-		logger:         logger,
-		output:         output.Output{},
+		projectID:         credentials.ProjectID,
+		region:            region,
+		zone:              fmt.Sprintf("%s-b", region), //append zone b
+		instanceType:      instanceType,
+		computeService:    computeService,
+		instanceClient:    computeService.Instances,
+		machineTypeClient: computeService.MachineTypes,
+		tags:              tags,
+		logger:            logger,
+		output:            output.Output{},
 	}
 
 	if err := c.validateMachineType(ctx); err != nil {
@@ -83,7 +85,7 @@ func (c *Client) validateMachineType(ctx context.Context) error {
 
 	c.logger.Debug(ctx, "Gathering description of instance type %s from EC2", c.instanceType)
 
-	descOut := c.computeService.MachineTypes.List(c.projectID, c.zone)
+	descOut := c.machineTypeClient.List(c.projectID, c.zone)
 
 	//check if instanceType is in the list
 	found := false
