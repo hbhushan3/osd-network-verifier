@@ -23,7 +23,8 @@ func TestValidateEgress(t *testing.T) {
 	ctx := context.TODO()
 	subnetID := "subnet-id"
 	cloudImageID := "image-id"
-	cli := Client{}
+	logger := &ocmlog.StdLogger{}
+	cli := &Client{logger: logger}
 	timeout := 1 * time.Second
 	if !cli.ValidateEgress(ctx, subnetID, cloudImageID, "", timeout).IsSuccessful() {
 		t.Errorf("validation should have been successful")
