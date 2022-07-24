@@ -8,9 +8,6 @@ import (
 	"github.com/openshift/osd-network-verifier/pkg/output"
 	"golang.org/x/oauth2/google"
 	computev1 "google.golang.org/api/compute/v1"
-	// "google.golang.org/api/option"
-	//compute "cloud.google.com/go/compute/apiv1"
-	//computepb "google.golang.org/genproto/googleapis/cloud/compute/v1"
 )
 
 // ClientIdentifier is what kind of cloud this implement supports
@@ -28,7 +25,7 @@ type Client struct {
 	output         output.Output
 	// Following two services get called by verifier which are defined in separate interfaces below, so we can mock their calls.
 	// however, currently, `createComputeServiceInstance` function uses a different version of rest client in instance `insert` function.
-	// That would need to be updated to use these computev1 based mocks.
+	// That would need to be updated to use these computev1 based mocks. The version issue has been fixed.
 	instanceClient    InstancesClient
 	machineTypeClient MachineTypeClient
 }
