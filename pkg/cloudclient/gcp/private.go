@@ -8,13 +8,9 @@ import (
 	"os"
 	"regexp"
 	"time"
-	// "path/filepath"
 
-	compute "cloud.google.com/go/compute/apiv1"
 	"golang.org/x/oauth2/google"
 	computev1 "google.golang.org/api/compute/v1"
-	computepb "google.golang.org/genproto/googleapis/cloud/compute/v1"
-	"google.golang.org/protobuf/proto"
 
 	ocmlog "github.com/openshift-online/ocm-sdk-go/logging"
 	handledErrors "github.com/openshift/osd-network-verifier/pkg/errors"
@@ -113,60 +109,52 @@ func (c *Client) validateMachineType(ctx context.Context) error {
 //ToDo func createComputeServiceInstance
 func (c *Client) createComputeServiceInstance(ctx context.Context, input createComputeServiceInstanceInput) (createComputeServiceInstanceInput, error) {
 
-	instancesClient, err := compute.NewInstancesRESTClient(ctx)
+	req := &computev1.Instance{
+		Name:        input.instanceName,
+		MachineType: fmt.Sprintf("zones/%s/machineTypes/%s", c.zone, input.machineType),
 
-	if err != nil {
-		fmt.Errorf("NewInstancesRESTClient: %v", err)
-	}
-	// defer instancesClient.Close()
-
-	req := &computepb.InsertInstanceRequest{
-		Project: c.projectID,
-		Zone:    c.zone,
-		InstanceResource: &computepb.Instance{
-			Name: proto.String(input.instanceName),
-			// Tags: &computepb.Tags{
-			// 	Items: []string{"http-server", "https-server"},
-			// },
-			Disks: []*computepb.AttachedDisk{
-				{
-					InitializeParams: &computepb.AttachedDiskInitializeParams{
-						DiskSizeGb:  proto.Int64(10),
-						SourceImage: proto.String(input.sourceImage),
-						// sourceImageEncryptionKey: &computepb.
-					},
-					AutoDelete: proto.Bool(true),
-					Boot:       proto.Bool(true),
-					Type:       proto.String(computepb.AttachedDisk_PERSISTENT.String()),
+		// Tags: &computev1.Tags{
+		// 	Items: []string{"http-server", "https-server"},
+		// },
+		Disks: []*computev1.AttachedDisk{
+			{
+				InitializeParams: &computev1.AttachedDiskInitializeParams{
+					DiskSizeGb:  10,
+					SourceImage: input.sourceImage,
+					// sourceImageEncryptionKey: &computepb.
 				},
+				AutoDelete: true,
+				Boot:       true,
+				Type:       "PERSISTENT",
 			},
-			MachineType: proto.String(fmt.Sprintf("zones/%s/machineTypes/%s", c.zone, input.machineType)),
-			NetworkInterfaces: []*computepb.NetworkInterface{
-				{
-					Name:       proto.String(input.networkName),
-					Subnetwork: proto.String(input.vpcSubnetID),
-				},
-			},
-			//pass gcpuserdata.yaml cloud-init script
-			Metadata: &computepb.Metadata{
-				Items: []*computepb.Items{
-					//can pass startup script
-					// {
-					// 	Key: proto.String("startup-script"),
-					// 	Value: proto.String("#!/bin/bash\n"),
-					// },
+		},
 
-					//pass gcpuserdata.yaml
-					{
-						Key:   proto.String("user-data"),
-						Value: proto.String(input.userdata),
-					},
+		NetworkInterfaces: []*computev1.NetworkInterface{
+			{
+				Name:       input.networkName,
+				Subnetwork: input.vpcSubnetID,
+			},
+		},
+		//pass gcpuserdata.yaml cloud-init script
+		Metadata: &computev1.Metadata{
+			Items: []*computev1.MetadataItems{
+				//can pass startup script
+				// {
+				// 	Key: proto.String("startup-script"),
+				// 	Value: proto.String("#!/bin/bash\n"),
+				// },
+
+				//pass gcpuserdata.yaml
+				{
+					Key:   "user-data",
+					Value: &input.userdata,
 				},
 			},
 		},
 	}
 
-	instanceResp, err := instancesClient.Insert(ctx, req)
+	//send request to computeService
+	instanceResp, err := c.instanceClient.Insert(c.projectID, c.zone, req).Context(ctx).Do()
 	if err != nil {
 		fmt.Errorf("unable to create instance: %v %v", err, instanceResp)
 	}
@@ -174,7 +162,7 @@ func (c *Client) createComputeServiceInstance(ctx context.Context, input createC
 	c.logger.Info(ctx, "Created instance with ID: %s", input.instanceName)
 
 	//get fingerprint from instance
-	inst, err := c.computeService.Instances.Get(c.projectID, c.zone, input.instanceName).Do()
+	inst, err := c.instanceClient.Get(c.projectID, c.zone, input.instanceName).Do()
 	if err != nil {
 		fmt.Errorf("Failed to get fingerprint to apply tags to instance %v", err)
 	}
@@ -188,7 +176,7 @@ func (c *Client) createComputeServiceInstance(ctx context.Context, input createC
 	}
 
 	//send request to apply tags
-	resp, err := c.computeService.Instances.SetLabels(c.projectID, c.zone, input.instanceName, reqbody).Context(ctx).Do()
+	resp, err := c.instanceClient.SetLabels(c.projectID, c.zone, input.instanceName, reqbody).Context(ctx).Do()
 	if err != nil {
 		fmt.Errorf("unable to create label: %v", err)
 	}
@@ -210,7 +198,7 @@ func (c *Client) describeComputeServiceInstances(ctx context.Context, instanceNa
 
 	//Error Codes https://cloud.google.com/apis/design/errors
 
-	resp, err := c.computeService.Instances.Get(c.projectID, c.zone, instanceName).Context(ctx).Do()
+	resp, err := c.instanceClient.Get(c.projectID, c.zone, instanceName).Context(ctx).Do()
 	if err != nil {
 		c.logger.Error(ctx, "Errors while describing the instance status: %v", err.Error())
 		return "PERMISSION DENIED", err
@@ -282,7 +270,7 @@ func (c *Client) findUnreachableEndpoints(ctx context.Context, instanceName stri
 
 	// getConsoleOutput then parse, use c.output to store result of the execution
 	err := helpers.PollImmediate(30*time.Second, 4*time.Minute, func() (bool, error) {
-		output, err := c.computeService.Instances.GetSerialPortOutput(c.projectID, c.zone, instanceName).Context(ctx).Do()
+		output, err := c.instanceClient.GetSerialPortOutput(c.projectID, c.zone, instanceName).Context(ctx).Do()
 		if err != nil {
 			return false, err
 		}
@@ -337,7 +325,7 @@ func (c *Client) findUnreachableEndpoints(ctx context.Context, instanceName stri
 func (c *Client) terminateComputeServiceInstance(ctx context.Context, instanceName string) {
 	c.logger.Info(ctx, "Terminating ComputeService instance with id %s", instanceName)
 
-	_, err := c.computeService.Instances.Stop(c.projectID, c.zone, instanceName).Context(ctx).Do()
+	_, err := c.instanceClient.Stop(c.projectID, c.zone, instanceName).Context(ctx).Do()
 	if err != nil {
 		fmt.Errorf("Unable to terminate instance: %v", err)
 	}

@@ -9,7 +9,6 @@ import (
 	"golang.org/x/oauth2/google"
 	computev1 "google.golang.org/api/compute/v1"
 	// "google.golang.org/api/option"
-
 	//compute "cloud.google.com/go/compute/apiv1"
 	//computepb "google.golang.org/genproto/googleapis/cloud/compute/v1"
 )
@@ -27,9 +26,9 @@ type Client struct {
 	tags           map[string]string
 	logger         ocmlog.Logger
 	output         output.Output
-	// Following two services get called by verifier which are defined in separate interfaces below, so we can mock their calls. 
-	// however, currently, `createComputeServiceInstance` function uses a different version of rest client in instance `insert` function. 
-	// That would need to be updated to use these computev1 based mocks. 
+	// Following two services get called by verifier which are defined in separate interfaces below, so we can mock their calls.
+	// however, currently, `createComputeServiceInstance` function uses a different version of rest client in instance `insert` function.
+	// That would need to be updated to use these computev1 based mocks.
 	instanceClient    InstancesClient
 	machineTypeClient MachineTypeClient
 }
