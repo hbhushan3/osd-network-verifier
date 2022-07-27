@@ -62,14 +62,14 @@ func TestValidateEgress(t *testing.T) {
 
 	})
 
-	// cli := Client{
-	// 	ec2Client: FakeEC2Cli,
-	// 	logger:    &logging.GlogLogger{},
-	// }
+	cli := Client{
+		ec2Client: FakeEC2Cli,
+		logger:    &logging.GlogLogger{},
+	}
 
-	// if !cli.validateEgress(context.TODO(), vpcSubnetID, cloudImageID, "", time.Duration(1*time.Second)).IsSuccessful() {
-	// 	t.Errorf("validateEgress(): should pass")
-	// }
+	if !cli.validateEgress(context.TODO(), vpcSubnetID, cloudImageID, "", time.Duration(1*time.Second)).IsSuccessful() {
+		t.Errorf("validateEgress(): should pass")
+	}
 }
 
 func TestNewClient(t *testing.T) {
